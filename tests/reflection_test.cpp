@@ -4,6 +4,7 @@
 #include "flatbuffers/reflection.h"
 #include "flatbuffers/reflection_generated.h"
 #include "flatbuffers/verifier.h"
+#include "flatbuffers/idl.h"
 #include "test_assert.h"
 #include "monster_test.h"
 #include "monster_test_generated.h"
@@ -319,6 +320,67 @@ void MiniReflectFixedLengthArrayTest() {
       "}",
       s.c_str());
 #endif
+}
+
+void ParserDeclFileSerDeTest(const std::string &tests_data_path) {
+  auto monster_fbs_file_path = tests_data_path + "monster_test.fbs";
+  auto project_root = ".";
+  auto monster_fbs_relative_to_root = RelativeToRootPath(project_root, monster_fbs_file_path);
+
+  std::string schema_file_contents;
+  TEST_EQ(flatbuffers::LoadFile(monster_fbs_file_path.c_str(), false,
+                                &schema_file_contents),
+          true);
+
+  flatbuffers::Parser parser;
+  parser.opts.project_root = project_root;
+  auto include_test_path =
+      flatbuffers::ConCatPathFileName(tests_data_path, "include_test");
+  const char *include_directories[] = { tests_data_path.c_str(),
+                                        include_test_path.c_str(), nullptr };
+  TEST_EQ(parser.Parse(schema_file_contents.c_str(), include_directories, monster_fbs_file_path.c_str()), true);
+
+  // First, make sure the parser correctly created the parsed Monster type.
+  auto monster_type = parser.structs_.Lookup("MyGame.Example.Monster");
+  TEST_NOTNULL(monster_type);
+  TEST_EQ(monster_type->fixed, false);
+  TEST_EQ_STR(monster_type->file.c_str(), monster_fbs_file_path.c_str());
+  TEST_EQ_STR(monster_type->declaration_file->c_str(),
+             monster_fbs_relative_to_root.c_str());
+  auto race_enum_type = parser.enums_.Lookup("MyGame.Example.Race");
+  TEST_NOTNULL(race_enum_type);
+  TEST_EQ_STR(race_enum_type->file.c_str(), monster_fbs_file_path.c_str());
+  TEST_EQ_STR(race_enum_type->declaration_file->c_str(),
+              monster_fbs_relative_to_root.c_str());
+
+  // Now, serialize the contents of the parser into binary reflection::Schema.
+  parser.Serialize();
+  auto schema_buf = parser.builder_.Release();
+  auto *schema = flatbuffers::GetRoot<reflection::Schema>(schema_buf.data());
+  TEST_NOTNULL(schema);
+  TEST_EQ(flatbuffers::Verifier(schema_buf.data(), schema_buf.size())
+              .VerifyBuffer<reflection::Schema>(nullptr),
+          true);
+  const reflection::Object *monster_object = schema->objects()->LookupByKey("MyGame.Example.Monster");
+  const reflection::Enum *race_enum = schema->enums()->LookupByKey("MyGame.Example.Race");
+  TEST_NOTNULL(monster_object);
+  TEST_NOTNULL(race_enum);
+
+  // Now, deserialize the binary reflection::Schema into a new parser.
+  flatbuffers::Parser parser2;
+  parser2.opts.project_root = project_root;
+  parser2.Deserialize(schema_buf.data(), schema_buf.size());
+  // Make sure the new parser correctly created the parsed Monster type.
+  auto monster_type2 = parser2.structs_.Lookup("MyGame.Example.Monster");
+  TEST_NOTNULL(monster_type2);
+  TEST_EQ(monster_type2->fixed, false);
+  TEST_EQ_STR(monster_type2->file.c_str(), monster_fbs_relative_to_root.c_str());
+  TEST_EQ_STR(monster_type2->declaration_file->c_str(), monster_fbs_relative_to_root.c_str());
+  // What about the enums?
+  auto race_enum_type2 = parser2.enums_.Lookup("MyGame.Example.Race");
+  TEST_NOTNULL(race_enum_type2);
+  TEST_EQ_STR(race_enum_type2->file.c_str(), monster_fbs_relative_to_root.c_str());
+  TEST_EQ_STR(race_enum_type2->declaration_file->c_str(), monster_fbs_relative_to_root.c_str());
 }
 
 }  // namespace tests

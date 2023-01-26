@@ -1541,6 +1541,7 @@ int FlatBufferTests(const std::string &tests_data_path) {
   FixedLengthArrayJsonTest(tests_data_path, false);
   FixedLengthArrayJsonTest(tests_data_path, true);
   ReflectionTest(tests_data_path, flatbuf.data(), flatbuf.size());
+  ParserDeclFileSerDeTest(tests_data_path);
   ParseProtoTest(tests_data_path);
   ParseProtoTestWithSuffix(tests_data_path);
   ParseProtoTestWithIncludes(tests_data_path);

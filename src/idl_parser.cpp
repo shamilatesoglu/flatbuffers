@@ -3827,8 +3827,7 @@ Offset<reflection::Object> StructDef::Serialize(FlatBufferBuilder *builder,
   const auto docs__ = parser.opts.binary_schema_comments && !doc_comment.empty()
                           ? builder->CreateVectorOfStrings(doc_comment)
                           : 0;
-  std::string decl_file_in_project = declaration_file ? *declaration_file : "";
-  const auto file__ = builder->CreateSharedString(decl_file_in_project);
+  const auto file__ = SerializeDeclFile(builder);
   return reflection::CreateObject(
       *builder, name__, flds__, fixed, static_cast<int>(minalign),
       static_cast<int>(bytesize), attr__, docs__, file__);
@@ -3837,6 +3836,7 @@ Offset<reflection::Object> StructDef::Serialize(FlatBufferBuilder *builder,
 bool StructDef::Deserialize(Parser &parser, const reflection::Object *object) {
   if (!DeserializeAttributes(parser, object->attributes())) return false;
   DeserializeDoc(doc_comment, object->documentation());
+  if (!DeserializeDeclFile(parser, object->declaration_file())) return false;
   name = parser.UnqualifiedName(object->name()->str());
   predecl = false;
   sortbysize = attributes.Lookup("original_order") == nullptr && !fixed;
@@ -3966,8 +3966,7 @@ Offset<reflection::Service> ServiceDef::Serialize(FlatBufferBuilder *builder,
   const auto docs__ = parser.opts.binary_schema_comments && !doc_comment.empty()
                           ? builder->CreateVectorOfStrings(doc_comment)
                           : 0;
-  std::string decl_file_in_project = declaration_file ? *declaration_file : "";
-  const auto file__ = builder->CreateSharedString(decl_file_in_project);
+  const auto file__ = SerializeDeclFile(builder);
   return reflection::CreateService(*builder, name__, call__, attr__, docs__,
                                    file__);
 }
@@ -3987,6 +3986,7 @@ bool ServiceDef::Deserialize(Parser &parser,
   }
   if (!DeserializeAttributes(parser, service->attributes())) return false;
   DeserializeDoc(doc_comment, service->documentation());
+  if (!DeserializeDeclFile(parser, service->declaration_file())) return false;
   return true;
 }
 
@@ -4004,8 +4004,7 @@ Offset<reflection::Enum> EnumDef::Serialize(FlatBufferBuilder *builder,
   const auto docs__ = parser.opts.binary_schema_comments && !doc_comment.empty()
                           ? builder->CreateVectorOfStrings(doc_comment)
                           : 0;
-  std::string decl_file_in_project = declaration_file ? *declaration_file : "";
-  const auto file__ = builder->CreateSharedString(decl_file_in_project);
+  const auto file__ = SerializeDeclFile(builder);
   return reflection::CreateEnum(*builder, name__, vals__, is_union, type__,
                                 attr__, docs__, file__);
 }
@@ -4026,6 +4025,7 @@ bool EnumDef::Deserialize(Parser &parser, const reflection::Enum *_enum) {
   }
   if (!DeserializeAttributes(parser, _enum->attributes())) return false;
   DeserializeDoc(doc_comment, _enum->documentation());
+  if (!DeserializeDeclFile(parser, _enum->declaration_file())) return false;
   return true;
 }
 
@@ -4114,6 +4114,18 @@ Definition::SerializeAttributes(FlatBufferBuilder *builder,
 bool Definition::DeserializeAttributes(
     Parser &parser, const Vector<Offset<reflection::KeyValue>> *attrs) {
   return DeserializeAttributesCommon(attributes, parser, attrs);
+}
+
+flatbuffers::Offset<flatbuffers::String>
+Definition::SerializeDeclFile(FlatBufferBuilder *builder) const {
+  return builder->CreateSharedString(declaration_file ? *declaration_file : "");
+}
+
+bool Definition::DeserializeDeclFile(Parser& parser,
+  const flatbuffers::String* declaration_file) {
+  if (!declaration_file) return true;
+  file = declaration_file->str();
+  this->declaration_file = &file;
 }
 
 /************************************************************************/

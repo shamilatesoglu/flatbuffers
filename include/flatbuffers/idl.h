@@ -274,6 +274,12 @@ struct Definition {
   bool DeserializeAttributes(Parser &parser,
                              const Vector<Offset<reflection::KeyValue>> *attrs);
 
+  flatbuffers::Offset<flatbuffers::String>
+  SerializeDeclFile(FlatBufferBuilder *builder) const;
+
+  bool DeserializeDeclFile(Parser& parser,
+                           const flatbuffers::String *declaration_file);
+
   std::string name;
   std::string file;
   std::vector<std::string> doc_comment;
